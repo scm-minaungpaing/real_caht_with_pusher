@@ -6,7 +6,7 @@
                     v-if="currentRoom.id"
                     :rooms="chatRooms"
                     :currentRoom="currentRoom"
-                    :roomChanged="setRoom()"
+                    @roomChanged="setRoom( $event )"
                 />
             </h2>
         </template>
@@ -17,7 +17,7 @@
                     <MessageContainer :messages="messages"/>
                     <InputMessage
                         :room="currentRoom"
-                        :messagesent="getMessages()"
+                        @messagesent="getMessages()"
                     />
                 </div>
             </div>
@@ -30,7 +30,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import Welcome from '@/Jetstream/Welcome.vue';
 import MessageContainer from './messageContainer.vue';
 import InputMessage from './inputMessage.vue';
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { reactive, ref } from '@vue/reactivity';
 import axios from 'axios';
 import ChatRoomSelection from './chatRoomSelection.vue';
@@ -43,7 +43,6 @@ const messages = ref([])
 const getRooms = async () => {
     await axios.get('/chat/rooms').then( res => {
         chatRooms.value = res.data;
-        if (res.data.length === 0) return
         setRoom(res.data[0])
     })
     .catch( error => {
@@ -53,12 +52,10 @@ const getRooms = async () => {
 
 const setRoom = ( room ) => {
     currentRoom.value = room
-    getMessages()
+    // getMessages()
 }
 
 const getMessages = () => {
-    if( !currentRoom.value ) return
-    console.log('=======>', currentRoom.value)
     axios.get(`./chat/room/${currentRoom.value.id}/messages`)
     .then( res => {
         messages.value = res.data
@@ -67,6 +64,27 @@ const getMessages = () => {
         console.log(error)
     })
 }
+
+const connect = () => {
+    if ( currentRoom.value) {
+        getMessages()
+        window.Echo.channel(`chat.${currentRoom.value.id}`)
+        .listen('.my-chat-event', e => {
+            getMessages();
+        })
+    }
+}
+
+const disconnect = ( room ) => {
+    window.Echo.leave(`chat.${room.id}`)
+}
+
+watch(currentRoom, (val, oldVal) => {
+    if ( oldVal.id) {
+        disconnect( oldVal )
+    }
+    connect()
+})
 
 onMounted(async () => {
     await getRooms()

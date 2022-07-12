@@ -6,6 +6,7 @@
         <div>
             <select
                 v-model="selected"
+                @change="$emit('roomChanged', selected)"
                 class="float-right"
             >
                 <option
